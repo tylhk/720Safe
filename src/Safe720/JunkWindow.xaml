@@ -1,0 +1,64 @@
+<Window x:Class="Safe720.JunkWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="垃圾清理 - 720安全大王" Width="520" Height="520" MinWidth="420" MinHeight="380"
+        WindowStartupLocation="CenterScreen" FontFamily="Microsoft YaHei UI" FontSize="13"
+        Background="#F5F7FA">
+    <Grid Margin="16">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <StackPanel Grid.Row="0" Margin="0,0,0,10">
+            <TextBlock x:Name="DiskText" FontSize="15" FontWeight="SemiBold"/>
+            <ProgressBar x:Name="DiskBar" Height="8" Margin="0,6,0,0" Maximum="100"/>
+        </StackPanel>
+
+        <Border Grid.Row="1" Background="White" BorderBrush="#DDE2EA" BorderThickness="1" CornerRadius="4">
+            <ScrollViewer VerticalScrollBarVisibility="Auto">
+                <ItemsControl x:Name="List" Margin="4">
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate>
+                            <Grid Margin="8,8,8,8" IsEnabled="{Binding IsAvailable}">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto"/>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="Auto"/>
+                                </Grid.ColumnDefinitions>
+                                <CheckBox Grid.Column="0" IsChecked="{Binding IsSelected}" VerticalAlignment="Top" Margin="0,3,10,0"
+                                          Checked="Selection_Changed" Unchecked="Selection_Changed"/>
+                                <StackPanel Grid.Column="1">
+                                    <TextBlock Text="{Binding Name}" FontWeight="SemiBold"/>
+                                    <TextBlock Text="{Binding Description}" Foreground="#6B7280" FontSize="12" TextWrapping="Wrap"/>
+                                    <TextBlock Text="{Binding Note}" Foreground="#D97706" FontSize="12" TextWrapping="Wrap">
+                                        <TextBlock.Style>
+                                            <Style TargetType="TextBlock">
+                                                <Style.Triggers>
+                                                    <Trigger Property="Text" Value="">
+                                                        <Setter Property="Visibility" Value="Collapsed"/>
+                                                    </Trigger>
+                                                </Style.Triggers>
+                                            </Style>
+                                        </TextBlock.Style>
+                                    </TextBlock>
+                                </StackPanel>
+                                <TextBlock Grid.Column="2" Text="{Binding SizeText}" FontWeight="SemiBold" Margin="12,0,0,0"
+                                           VerticalAlignment="Top" MinWidth="70" TextAlignment="Right"/>
+                            </Grid>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+            </ScrollViewer>
+        </Border>
+
+        <Grid Grid.Row="2" Margin="0,12,0,0">
+            <TextBlock x:Name="SummaryText" VerticalAlignment="Center" Foreground="#374151"/>
+            <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+                <Button x:Name="ScanButton" Content="重新扫描" Padding="14,5" Margin="0,0,8,0" Click="Scan_Click"/>
+                <Button x:Name="CleanButton" Content="清理所选" Padding="14,5" FontWeight="SemiBold" Click="Clean_Click"/>
+            </StackPanel>
+        </Grid>
+    </Grid>
+</Window>

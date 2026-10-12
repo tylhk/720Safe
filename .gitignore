@@ -1,0 +1,6 @@
+﻿.build/
+src/Safe720/bin/
+src/Safe720/obj/
+*.user
+.vs/
+publish/

@@ -1,0 +1,23 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net9.0-windows</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <UseWPF>true</UseWPF>
+    <RootNamespace>Safe720</RootNamespace>
+    <AssemblyName>Safe720</AssemblyName>
+    <ApplicationManifest>app.manifest</ApplicationManifest>
+    <Version>0.1.0</Version>
+    <Company>satone</Company>
+    <Product>720安全大王</Product>
+    <AssemblyTitle>720安全大王</AssemblyTitle>
+    <PlatformTarget>x64</PlatformTarget>
+    <Prefer32Bit>false</Prefer32Bit>
+  </PropertyGroup>  <!-- 单文件发布版才启用一键自安装逻辑(Debug 直接运行不触发) -->
+  <PropertyGroup Condition="'$(PublishSingleFile)' == 'true'">
+    <DefineConstants>$(DefineConstants);SELF_INSTALL</DefineConstants>
+  </PropertyGroup>
+
+</Project>
