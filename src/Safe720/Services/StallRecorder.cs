@@ -33,6 +33,7 @@ public sealed class StallRecorder : IDisposable
     private readonly object _stateLock = new();
     private static readonly object LogLock = new();
     private int _busy;
+    private int _generation; // 每次 Start 加一，后台初始化据此判断是否已过期
 
     private int _cpuRun, _memRun, _diskRun, _clearRun;
     private bool _inStall;
@@ -41,28 +42,51 @@ public sealed class StallRecorder : IDisposable
 
     public bool IsRunning => _timer is not null;
 
+    /// <summary>卡顿开始时触发（在后台线程上）。</summary>
+    public event Action<StallAlert>? StallStarted;
+
     public void Start()
     {
+        int generation;
         lock (_stateLock)
         {
             if (_timer is not null) return;
-            Directory.CreateDirectory(AppPaths.DataDir);
-            CheckPreviousSession();
-
-            try
-            {
-                _diskIdle = new PerformanceCounter("PhysicalDisk", "% Idle Time", "_Total", readOnly: true);
-                _diskIdle.NextValue(); // 首次读数无效，建立基线
-            }
-            catch
-            {
-                _diskIdle = null; // 计数器不可用则只监测 CPU/内存
-            }
-
             _cpu.GetUsagePercent();
             _cpuRun = _memRun = _diskRun = _clearRun = 0;
             _inStall = false;
-            _timer = new Timer(_ => Tick(), null, IntervalMs, IntervalMs);
+            _timer = new Timer(_ => Tick(), null, IntervalMs, IntervalMs); // 磁盘计数器就绪前只监测 CPU/内存
+            generation = ++_generation;
+        }
+        // 创建磁盘计数器要加载全系统的性能计数器表（实测 2~8 秒、约 2 秒 CPU），查系统日志也慢，
+        // 放在调用线程(界面线程)上会让悬浮球开机后卡住好几秒，所以都放到后台
+        Task.Run(() => InitInBackground(generation));
+    }
+
+    private void InitInBackground(int generation)
+    {
+        try { Directory.CreateDirectory(AppPaths.DataDir); } catch { }
+        CheckPreviousSession(); // 必须在写入本次心跳之前读上次的心跳
+
+        PerformanceCounter? disk;
+        try
+        {
+            disk = new PerformanceCounter("PhysicalDisk", "% Idle Time", "_Total", readOnly: true);
+            disk.NextValue(); // 首次读数无效，建立基线
+        }
+        catch
+        {
+            disk = null; // 计数器不可用则只监测 CPU/内存
+        }
+
+        lock (_stateLock)
+        {
+            // 初始化期间已被停止(或停止后又重新启动)，丢弃本次结果
+            if (_timer is null || generation != _generation)
+            {
+                disk?.Dispose();
+                return;
+            }
+            _diskIdle = disk;
             _heartbeat = new Timer(_ => WriteHeartbeat("running"), null, 0, 60_000);
         }
     }
@@ -142,10 +166,18 @@ public sealed class StallRecorder : IDisposable
         if (_memRun >= TriggerSamples) reasons.Add($"内存 {mem:F0}%");
         if (_diskRun >= TriggerSamples) reasons.Add($"磁盘繁忙 {disk:F0}%");
 
+        var groups = SnapshotProcesses();
         var sb = new StringBuilder();
         sb.AppendLine($"卡顿开始：{string.Join("、", reasons)}（已持续 10 秒）");
-        sb.Append(SnapshotProcesses());
+        sb.Append(FormatSnapshot(groups));
         Log(sb.ToString().TrimEnd());
+
+        // 多个原因同时满足时按 CPU > 磁盘 > 内存 取主因（CPU、磁盘满载最影响操作手感）
+        ProcessSort sort = _cpuRun >= TriggerSamples ? ProcessSort.Cpu
+            : _diskRun >= TriggerSamples ? ProcessSort.Disk
+            : ProcessSort.Memory;
+        try { StallStarted?.Invoke(new StallAlert(string.Join("、", reasons), Culprits(groups, sort), sort)); }
+        catch { /* 订阅方异常不影响记录 */ }
     }
 
     private void EndStall()
@@ -157,101 +189,44 @@ public sealed class StallRecorder : IDisposable
     }
 
     // ---------- 进程快照 ----------
-    private const uint PROCESS_QUERY_LIMITED_INFORMATION = 0x1000;
-
-    [StructLayout(LayoutKind.Sequential)]
-    private struct IO_COUNTERS
+    /// <summary>1 秒窗口内各进程(按名合并) CPU / IO 增量与私有内存。</summary>
+    private static List<ProcessGroup> SnapshotProcesses()
     {
-        public ulong ReadOperationCount, WriteOperationCount, OtherOperationCount;
-        public ulong ReadTransferCount, WriteTransferCount, OtherTransferCount;
+        var sampler = new ProcessSampler();
+        sampler.Sample();
+        Thread.Sleep(1000);
+        return sampler.Sample();
     }
 
-    [DllImport("kernel32.dll", SetLastError = true)]
-    private static extern IntPtr OpenProcess(uint access, bool inherit, int pid);
-
-    [DllImport("kernel32.dll")]
-    private static extern bool CloseHandle(IntPtr h);
-
-    [DllImport("kernel32.dll", SetLastError = true)]
-    private static extern bool GetProcessTimes(IntPtr h, out long creation, out long exit, out long kernel, out long user);
-
-    [DllImport("kernel32.dll", SetLastError = true)]
-    private static extern bool GetProcessIoCounters(IntPtr h, out IO_COUNTERS io);
-
-    private sealed class ProcSample
+    private static string FormatSnapshot(List<ProcessGroup> groups)
     {
-        public int Pid;
-        public string Name = "";
-        public IntPtr Handle;
-        public long Cpu0;
-        public ulong Io0;
-        public double CpuPct;
-        public double IoBps;
-    }
-
-    /// <summary>1 秒窗口内各进程 CPU / IO 增量，加上按进程名汇总的私有内存。</summary>
-    private static string SnapshotProcesses()
-    {
-        var procs = Process.GetProcesses();
-        var samples = new List<ProcSample>();
-        var memByName = new Dictionary<string, (int Count, long Bytes)>(StringComparer.OrdinalIgnoreCase);
-
-        try
-        {
-            foreach (var p in procs)
-            {
-                string name;
-                try { name = p.ProcessName; } catch { continue; }
-
-                try
-                {
-                    long priv = p.PrivateMemorySize64;
-                    memByName.TryGetValue(name, out var m);
-                    memByName[name] = (m.Count + 1, m.Bytes + priv);
-                }
-                catch { }
-
-                IntPtr h = OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, false, p.Id);
-                if (h == IntPtr.Zero) continue;
-                var s = new ProcSample { Pid = p.Id, Name = name, Handle = h };
-                if (GetProcessTimes(h, out _, out _, out long k, out long u)) s.Cpu0 = k + u;
-                if (GetProcessIoCounters(h, out var io)) s.Io0 = io.ReadTransferCount + io.WriteTransferCount;
-                samples.Add(s);
-            }
-
-            var sw = Stopwatch.StartNew();
-            Thread.Sleep(1000);
-            double secs = sw.Elapsed.TotalSeconds;
-
-            foreach (var s in samples)
-            {
-                if (GetProcessTimes(s.Handle, out _, out _, out long k, out long u))
-                    s.CpuPct = (k + u - s.Cpu0) / (secs * 1e7) / Environment.ProcessorCount * 100;
-                if (GetProcessIoCounters(s.Handle, out var io))
-                    s.IoBps = (io.ReadTransferCount + io.WriteTransferCount - s.Io0) / secs;
-            }
-        }
-        finally
-        {
-            foreach (var s in samples) CloseHandle(s.Handle);
-            foreach (var p in procs) p.Dispose();
-        }
+        static string Label(ProcessGroup g) => g.Pids.Count > 1 ? $"{g.Name}×{g.Pids.Count}" : g.Name;
 
         var sb = new StringBuilder();
-        var topCpu = samples.Where(s => s.CpuPct >= 0.5).OrderByDescending(s => s.CpuPct).Take(5)
-            .Select(s => $"{s.Name}({s.Pid}) {s.CpuPct:F0}%");
+        var topCpu = ProcessSampler.Top(groups.Where(g => g.CpuPct >= 0.5), ProcessSort.Cpu).Take(5)
+            .Select(g => $"{Label(g)} {g.CpuPct:F0}%");
         sb.AppendLine("  CPU 前5：" + JoinOrNone(topCpu));
 
-        var topIo = samples.Where(s => s.IoBps >= 100 * 1024).OrderByDescending(s => s.IoBps).Take(5)
-            .Select(s => $"{s.Name}({s.Pid}) {s.IoBps / 1024 / 1024:F1} MB/s");
+        var topIo = ProcessSampler.Top(groups.Where(g => g.IoBps >= 100 * 1024), ProcessSort.Disk).Take(5)
+            .Select(g => $"{Label(g)} {g.IoBps / 1024 / 1024:F1} MB/s");
         sb.AppendLine("  磁盘读写前5：" + JoinOrNone(topIo));
 
-        var topMem = memByName.OrderByDescending(kv => kv.Value.Bytes).Take(5)
-            .Select(kv => kv.Value.Count > 1
-                ? $"{kv.Key}×{kv.Value.Count} {SizeFormat.Of(kv.Value.Bytes)}"
-                : $"{kv.Key} {SizeFormat.Of(kv.Value.Bytes)}");
+        var topMem = ProcessSampler.Top(groups, ProcessSort.Memory).Take(5)
+            .Select(g => $"{Label(g)} {SizeFormat.Of(g.PrivateBytes)}");
         sb.AppendLine("  内存前5：" + JoinOrNone(topMem));
         return sb.ToString();
+    }
+
+    /// <summary>通知用的一句话：按卡顿原因取占用最高的 3 个程序（排除系统进程）。</summary>
+    private static string Culprits(List<ProcessGroup> groups, ProcessSort sort)
+    {
+        var top = ProcessSampler.Top(groups.Where(g => !g.IsSystem), sort).Take(3).Select(g => sort switch
+        {
+            ProcessSort.Cpu => $"{g.Name} {g.CpuPct:F0}%",
+            ProcessSort.Disk => $"{g.Name} {g.IoBps / 1024 / 1024:F1} MB/s",
+            _ => $"{g.Name} {SizeFormat.Of(g.PrivateBytes)}",
+        });
+        return string.Join("、", top);
     }
 
     private static string JoinOrNone(IEnumerable<string> items)
@@ -321,6 +296,16 @@ public sealed class StallRecorder : IDisposable
     }
 
     // ---------- 日志 ----------
+    /// <summary>用记事本等默认程序打开卡顿日志，没有日志时先写一行说明。</summary>
+    public static void OpenLog(bool recording)
+    {
+        if (!File.Exists(AppPaths.StallLog))
+            Log(recording
+                ? "暂无卡顿记录。CPU/内存/磁盘任一项持续 10 秒满负荷时会记在这里。"
+                : "卡顿记录未开启（右键悬浮球 → 设置 → 记录卡顿）。");
+        Process.Start(new ProcessStartInfo(AppPaths.StallLog) { UseShellExecute = true });
+    }
+
     public static void Log(string text)
     {
         lock (LogLock)
@@ -339,3 +324,8 @@ public sealed class StallRecorder : IDisposable
         }
     }
 }
+
+/// <param name="Reasons">如"CPU 98%、内存 92%"。</param>
+/// <param name="Culprits">占用最高的几个程序，如"chrome 45%、Code 20%"，可能为空。</param>
+/// <param name="Sort">主因，打开进程窗口时按它排序。</param>
+public sealed record StallAlert(string Reasons, string Culprits, ProcessSort Sort);

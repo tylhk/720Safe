@@ -1,0 +1,85 @@
+<Window x:Class="Safe720.UninstallWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="软件卸载 - 720安全大王" Width="640" Height="600" MinWidth="480" MinHeight="380"
+        WindowStartupLocation="CenterScreen" FontFamily="Microsoft YaHei UI" FontSize="13"
+        Background="#F5F7FA">
+    <Grid Margin="16">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <Grid Grid.Row="0" Margin="0,0,0,10">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="Auto"/>
+            </Grid.ColumnDefinitions>
+            <Grid>
+                <TextBox x:Name="SearchBox" Padding="6,4" VerticalContentAlignment="Center" TextChanged="Search_TextChanged"/>
+                <TextBlock Text="搜索软件名或发布者" Foreground="#9CA3AF" Margin="9,0,0,0" VerticalAlignment="Center"
+                           IsHitTestVisible="False">
+                    <TextBlock.Style>
+                        <Style TargetType="TextBlock">
+                            <Setter Property="Visibility" Value="Collapsed"/>
+                            <Style.Triggers>
+                                <DataTrigger Binding="{Binding Text, ElementName=SearchBox}" Value="">
+                                    <Setter Property="Visibility" Value="Visible"/>
+                                </DataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </TextBlock.Style>
+                </TextBlock>
+            </Grid>
+            <ComboBox x:Name="SortBox" Grid.Column="1" Width="120" Margin="10,0,0,0" SelectedIndex="0"
+                      SelectionChanged="Sort_SelectionChanged">
+                <ComboBoxItem Content="按大小排序"/>
+                <ComboBoxItem Content="按安装时间排序"/>
+                <ComboBoxItem Content="按名称排序"/>
+            </ComboBox>
+        </Grid>
+
+        <Border Grid.Row="1" Background="White" BorderBrush="#DDE2EA" BorderThickness="1" CornerRadius="4">
+            <ListBox x:Name="List" BorderThickness="0" HorizontalContentAlignment="Stretch"
+                     VirtualizingPanel.IsVirtualizing="True" ScrollViewer.HorizontalScrollBarVisibility="Disabled">
+                <ListBox.ItemTemplate>
+                    <DataTemplate>
+                        <Grid Margin="4,6">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto"/>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="Auto"/>
+                                <ColumnDefinition Width="Auto"/>
+                            </Grid.ColumnDefinitions>
+                            <Image Source="{Binding Icon}" Width="28" Height="28" Margin="0,0,10,0" VerticalAlignment="Center"
+                                   RenderOptions.BitmapScalingMode="HighQuality"/>
+                            <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                                <TextBlock Text="{Binding Name}" FontWeight="SemiBold" TextTrimming="CharacterEllipsis"/>
+                                <TextBlock Text="{Binding Details}" Foreground="#6B7280" FontSize="12" TextTrimming="CharacterEllipsis"/>
+                            </StackPanel>
+                            <TextBlock Grid.Column="2" Text="{Binding SizeText}" FontWeight="SemiBold" MinWidth="70"
+                                       TextAlignment="Right" VerticalAlignment="Center" Margin="12,0"/>
+                            <Button Grid.Column="3" Content="卸载" Padding="12,3" VerticalAlignment="Center"
+                                    Click="Uninstall_Click" Tag="{Binding}"/>
+                        </Grid>
+                    </DataTemplate>
+                </ListBox.ItemTemplate>
+                <ListBox.ContextMenu>
+                    <ContextMenu>
+                        <MenuItem Header="打开安装目录" Click="OpenLocation_Click"/>
+                    </ContextMenu>
+                </ListBox.ContextMenu>
+            </ListBox>
+        </Border>
+
+        <Grid Grid.Row="2" Margin="0,12,0,0">
+            <TextBlock x:Name="SummaryText" VerticalAlignment="Center" Foreground="#374151"/>
+            <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+                <Button Content="应用商店的应用…" Padding="14,5" Margin="0,0,8,0" Click="StoreApps_Click"
+                        ToolTip="从微软应用商店安装的应用不在这个列表里，请在系统设置中卸载"/>
+                <Button Content="刷新" Padding="14,5" Click="Refresh_Click"/>
+            </StackPanel>
+        </Grid>
+    </Grid>
+</Window>

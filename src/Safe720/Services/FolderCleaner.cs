@@ -122,4 +122,9 @@ public static class SizeFormat
     public static string Compact(long bytes) => bytes >= 1L << 30
         ? $"{bytes / (double)(1L << 30):F1}GB"
         : $"{bytes / (double)(1L << 20):F0}MB";
+
+    /// <summary>磁盘读写速度。</summary>
+    public static string Speed(double bytesPerSec) => bytesPerSec >= 1 << 20
+        ? $"{bytesPerSec / (1 << 20):F1} MB/s"
+        : $"{bytesPerSec / 1024:F0} KB/s";
 }

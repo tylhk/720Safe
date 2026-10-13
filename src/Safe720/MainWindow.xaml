@@ -5,7 +5,7 @@
         Title="720安全大王" Height="80" Width="80"
         WindowStyle="None" AllowsTransparency="True" Background="Transparent"
         ShowInTaskbar="False" Topmost="True" ResizeMode="NoResize"
-        WindowStartupLocation="Manual">
+        WindowStartupLocation="Manual" AllowDrop="True">
     <Grid>
         <ctl:LiquidBall x:Name="Ball" Margin="4"/>
         <Path x:Name="HitArea" Fill="Transparent" Stretch="Fill">
@@ -14,24 +14,50 @@
             </Path.Data>
         </Path>
     </Grid>
+    <!-- 悬停提示：内存/CPU/C 盘/上次清理 -->
+    <Window.ToolTip>
+        <ToolTip Style="{StaticResource DarkToolTip}">
+            <TextBlock x:Name="TipText" FontFamily="Microsoft YaHei UI" LineHeight="20"/>
+        </ToolTip>
+    </Window.ToolTip>
     <Window.ContextMenu>
-        <ContextMenu>
-            <MenuItem Header="垃圾清理…" Click="MenuJunk_Click"/>
-            <MenuItem Header="启动项管理…" Click="MenuStartup_Click"/>
-            <MenuItem Header="清理临时文件" Click="MenuCleanTemp_Click"/>
-            <MenuItem Header="查看卡顿日志" Click="MenuStallLog_Click"/>
-            <Separator/>
-            <MenuItem Header="设置">
-                <MenuItem x:Name="MenuAutoClean" Header="每天自动清理临时文件" IsCheckable="True" Click="MenuAutoClean_Click"/>
-                <MenuItem x:Name="MenuDiskAlert" Header="C 盘空间不足提醒" IsCheckable="True" Click="MenuDiskAlert_Click"/>
-                <MenuItem x:Name="MenuStall" Header="记录卡顿" IsCheckable="True" Click="MenuStall_Click"/>
-                <Separator/>
-                <MenuItem x:Name="MenuTopmost" Header="置顶" IsCheckable="True" IsChecked="True" Click="MenuTopmost_Click"/>
-                <MenuItem x:Name="MenuAutostart" Header="开机自启" IsCheckable="True" Click="MenuAutostart_Click"/>
+        <ContextMenu Style="{StaticResource DarkMenu}">
+            <MenuItem Header="迷你面板（双击球）" Click="MenuPanel_Click">
+                <MenuItem.Icon><TextBlock Style="{StaticResource MenuGlyph}" Text="&#xE80A;"/></MenuItem.Icon>
             </MenuItem>
-            <MenuItem Header="以管理员身份重启" Click="MenuRelaunchAdmin_Click"/>
             <Separator/>
-            <MenuItem Header="退出" Click="MenuExit_Click"/>
+            <MenuItem Header="垃圾清理…" Click="MenuJunk_Click">
+                <MenuItem.Icon><TextBlock Style="{StaticResource MenuGlyph}" Text="&#xE74D;"/></MenuItem.Icon>
+            </MenuItem>
+            <MenuItem Header="C 盘空间分析…" Click="MenuDisk_Click">
+                <MenuItem.Icon><TextBlock Style="{StaticResource MenuGlyph}" Text="&#xEDA2;"/></MenuItem.Icon>
+            </MenuItem>
+            <MenuItem Header="软件卸载…" Click="MenuUninstall_Click">
+                <MenuItem.Icon><TextBlock Style="{StaticResource MenuGlyph}" Text="&#xE71D;"/></MenuItem.Icon>
+            </MenuItem>
+            <MenuItem Header="启动项管理…" Click="MenuStartup_Click">
+                <MenuItem.Icon><TextBlock Style="{StaticResource MenuGlyph}" Text="&#xE823;"/></MenuItem.Icon>
+            </MenuItem>
+            <MenuItem Header="高占用程序…" Click="MenuProcess_Click">
+                <MenuItem.Icon><TextBlock Style="{StaticResource MenuGlyph}" Text="&#xE9D9;"/></MenuItem.Icon>
+            </MenuItem>
+            <MenuItem Header="清理临时文件" Click="MenuCleanTemp_Click">
+                <MenuItem.Icon><TextBlock Style="{StaticResource MenuGlyph}" Text="&#xE894;"/></MenuItem.Icon>
+            </MenuItem>
+            <Separator/>
+            <MenuItem Header="设置…" Click="MenuSettings_Click">
+                <MenuItem.Icon><TextBlock Style="{StaticResource MenuGlyph}" Text="&#xE713;"/></MenuItem.Icon>
+            </MenuItem>
+            <MenuItem Header="隐藏悬浮球" Click="MenuHide_Click">
+                <MenuItem.Icon><TextBlock Style="{StaticResource MenuGlyph}" Text="&#xED1A;"/></MenuItem.Icon>
+            </MenuItem>
+            <MenuItem Header="以管理员身份重启" Click="MenuRelaunchAdmin_Click">
+                <MenuItem.Icon><TextBlock Style="{StaticResource MenuGlyph}" Text="&#xE7EF;"/></MenuItem.Icon>
+            </MenuItem>
+            <Separator/>
+            <MenuItem Header="退出" Click="MenuExit_Click">
+                <MenuItem.Icon><TextBlock Style="{StaticResource MenuGlyph}" Text="&#xE7E8;"/></MenuItem.Icon>
+            </MenuItem>
         </ContextMenu>
     </Window.ContextMenu>
 </Window>

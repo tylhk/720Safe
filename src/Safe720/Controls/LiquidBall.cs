@@ -3,12 +3,13 @@ using System.Collections.Generic;
 using System.Globalization;
 using System.Windows;
 using System.Windows.Media;
+using System.Windows.Threading;
 
 namespace Safe720.Controls;
 
 /// <summary>
 /// 液面加速球：自定义绘制，球体内液体按内存占用率填充，带波浪/高光/清理动画。
-/// 优化：静态画笔缓存冻结、文字按值缓存、待机波浪常驻流动（节流到约 30fps）。
+/// 优化：静态画笔缓存冻结、文字按值缓存、定时器驱动帧率（待机 20fps，动画时 60fps，隐藏时停止）。
 /// </summary>
 public sealed class LiquidBall : FrameworkElement
 {
@@ -152,11 +153,15 @@ public sealed class LiquidBall : FrameworkElement
     }
 
     // ---------- 动画状态 ----------
+    // 不用 CompositionTarget.Rendering：只要订阅了它，WPF 就按显示器刷新率(60~144Hz)空转渲染循环，
+    // 透明窗口每帧还要整窗交给系统合成，待机时 CPU 很可观。改用定时器自己控制帧率。
+    private const int IdleFrameMs = 50;  // 待机波浪 20fps，缓慢流动足够顺
+    private const int BusyFrameMs = 16;  // 清理动画、液面升降时 60fps
+    private readonly DispatcherTimer _frameTimer = new(DispatcherPriority.Render);
     private double _displayUsage;
     private double _phase;
     private double _cleanAngle;
     private long _lastMs;
-    private long _lastRenderMs;
     private readonly List<Bubble> _bubbles = new();
 
     // 文字缓存
@@ -167,7 +172,14 @@ public sealed class LiquidBall : FrameworkElement
     public LiquidBall()
     {
         _lastMs = Environment.TickCount64;
-        CompositionTarget.Rendering += OnRendering;
+        _frameTimer.Interval = TimeSpan.FromMilliseconds(IdleFrameMs);
+        _frameTimer.Tick += OnFrame;
+        // 隐藏到托盘时动画完全停掉
+        IsVisibleChanged += (_, _) =>
+        {
+            if (IsVisible) { _lastMs = Environment.TickCount64; _frameTimer.Start(); }
+            else _frameTimer.Stop();
+        };
     }
 
     private static void OnCleaningChanged(DependencyObject d, DependencyPropertyChangedEventArgs e)
@@ -176,10 +188,10 @@ public sealed class LiquidBall : FrameworkElement
             ball._bubbles.Clear();
     }
 
-    private void OnRendering(object? sender, EventArgs e)
+    private void OnFrame(object? sender, EventArgs e)
     {
         long now = Environment.TickCount64;
-        double dt = Math.Min((now - _lastMs) / 1000.0, 0.05);
+        double dt = Math.Min((now - _lastMs) / 1000.0, 0.1);
         _lastMs = now;
 
         // 时间相关相位：波浪速度恒定，与帧率无关
@@ -194,7 +206,7 @@ public sealed class LiquidBall : FrameworkElement
 
         if (IsCleaning)
         {
-            _cleanAngle = (_cleanAngle + dt * 420) % 360; // ~70°/帧@60fps -> 旋转弧
+            _cleanAngle = (_cleanAngle + dt * 420) % 360; // 旋转弧
             UpdateBubbles(dt);
         }
         else if (_bubbles.Count > 0)
@@ -202,18 +214,12 @@ public sealed class LiquidBall : FrameworkElement
             _bubbles.Clear();
         }
 
-        // 决定是否重绘：清理中/液面缓动中全速；待机波浪节流到 ~30fps
-        bool needRender = IsCleaning || changing;
-        if (!needRender && (now - _lastRenderMs) >= 33)
-        {
-            needRender = true;
-        }
+        // 清理中/液面缓动中提到 60fps，其余时间 20fps
+        int frameMs = IsCleaning || changing ? BusyFrameMs : IdleFrameMs;
+        if ((int)_frameTimer.Interval.TotalMilliseconds != frameMs)
+            _frameTimer.Interval = TimeSpan.FromMilliseconds(frameMs);
 
-        if (needRender)
-        {
-            _lastRenderMs = now;
-            InvalidateVisual();
-        }
+        InvalidateVisual();
     }
 
     private void UpdateBubbles(double dt)
@@ -464,7 +470,7 @@ public sealed class LiquidBall : FrameworkElement
     }
 
     // ---------- 配色 ----------
-    private static Color GetLiquidColor(double usage)
+    internal static Color GetLiquidColor(double usage)
     {
         Color c0 = Color.FromRgb(0x2e, 0xcc, 0x71); // green
         Color c1 = Color.FromRgb(0xf1, 0xc4, 0x0f); // yellow

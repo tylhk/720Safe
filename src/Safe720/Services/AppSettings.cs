@@ -26,6 +26,20 @@ public sealed class AppSettings
     public DateTime LastAutoClean { get; set; }
     public bool DiskAlert { get; set; } = true;
     public bool StallRecorder { get; set; } = true;
+    /// <summary>卡顿时托盘通知，点开可结束高占用程序（依赖 <see cref="StallRecorder"/>）。</summary>
+    public bool StallNotify { get; set; } = true;
+    public bool Topmost { get; set; } = true;
+    /// <summary>隐藏后只留托盘图标。</summary>
+    public bool BallVisible { get; set; } = true;
+    /// <summary>拖到屏幕左右边缘时吸附并缩进一半，鼠标靠近滑出。</summary>
+    public bool EdgeDock { get; set; } = true;
+    /// <summary>有程序全屏（视频、游戏、放映）时自动隐藏悬浮球。</summary>
+    public bool AutoHideFullscreen { get; set; } = true;
+    /// <summary>上次的位置（DIP），null = 默认右下角。</summary>
+    public double? BallLeft { get; set; }
+    public double? BallTop { get; set; }
+    /// <summary>0 未贴边，1 左边，2 右边。</summary>
+    public int DockSide { get; set; }
 
     private static readonly JsonSerializerOptions JsonOpts = new() { WriteIndented = true };
 

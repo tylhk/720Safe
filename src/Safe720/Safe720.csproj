@@ -6,6 +6,10 @@
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <UseWPF>true</UseWPF>
+    <!-- 只为托盘图标 NotifyIcon 引入 WinForms -->
+    <UseWindowsForms>true</UseWindowsForms>
+    <!-- WFO0003 要求 DPI 改用 WinForms 的 API 配置；本程序主体是 WPF，DPI 由 app.manifest 声明才对 -->
+    <NoWarn>$(NoWarn);WFO0003</NoWarn>
     <RootNamespace>Safe720</RootNamespace>
     <AssemblyName>Safe720</AssemblyName>
     <ApplicationManifest>app.manifest</ApplicationManifest>
@@ -15,7 +19,15 @@
     <AssemblyTitle>720安全大王</AssemblyTitle>
     <PlatformTarget>x64</PlatformTarget>
     <Prefer32Bit>false</Prefer32Bit>
-  </PropertyGroup>  <!-- 单文件发布版才启用一键自安装逻辑(Debug 直接运行不触发) -->
+  </PropertyGroup>
+
+  <!-- WinForms 的隐式 using 会和 WPF 的 Application/MessageBox/Point 等重名，去掉，用到时写全名 -->
+  <ItemGroup>
+    <Using Remove="System.Windows.Forms" />
+    <Using Remove="System.Drawing" />
+  </ItemGroup>
+
+  <!-- 单文件发布版才启用一键自安装逻辑(Debug 直接运行不触发) -->
   <PropertyGroup Condition="'$(PublishSingleFile)' == 'true'">
     <DefineConstants>$(DefineConstants);SELF_INSTALL</DefineConstants>
   </PropertyGroup>

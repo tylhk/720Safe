@@ -56,8 +56,10 @@
         <Grid Grid.Row="2" Margin="0,12,0,0">
             <TextBlock x:Name="SummaryText" VerticalAlignment="Center" Foreground="#374151"/>
             <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+                <Button Content="C 盘空间分析…" Padding="14,5" Margin="0,0,8,0" Click="DiskAnalysis_Click"
+                        ToolTip="查看 C 盘上哪些文件夹、文件最占空间"/>
                 <Button x:Name="ScanButton" Content="重新扫描" Padding="14,5" Margin="0,0,8,0" Click="Scan_Click"/>
-                <Button x:Name="CleanButton" Content="清理所选" Padding="14,5" FontWeight="SemiBold" Click="Clean_Click"/>
+                <Button x:Name="CleanButton" Content="清理所选" Padding="14,5" Style="{StaticResource PrimaryButton}" Click="Clean_Click"/>
             </StackPanel>
         </Grid>
     </Grid>

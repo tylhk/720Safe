@@ -103,4 +103,6 @@ public partial class JunkWindow : Window
     }
 
     private void Selection_Changed(object sender, RoutedEventArgs e) => UpdateSummary();
+
+    private void DiskAnalysis_Click(object sender, RoutedEventArgs e) => WindowHub.Show<DiskWindow>();
 }

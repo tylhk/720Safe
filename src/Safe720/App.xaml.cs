@@ -25,7 +25,12 @@ public partial class App : Application
         {
             string dir = args[ci + 1].Trim('"');
             Thread.Sleep(800); // 等待原进程退出释放文件锁
-            if (Directory.Exists(dir))
+            // 只允许删本程序自己的安装目录：这个参数谁都能传，不校验的话 --cleanup C:\Users 会把整个目录删掉
+            string ownDir = Path.Combine(
+                Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), InstallSubDir);
+            bool isOwnDir = string.Equals(Path.GetFullPath(dir).TrimEnd('\\'), Path.GetFullPath(ownDir).TrimEnd('\\'),
+                StringComparison.OrdinalIgnoreCase);
+            if (isOwnDir && Directory.Exists(dir))
             {
                 try { Directory.Delete(dir, recursive: true); } catch { }
             }
@@ -71,7 +76,57 @@ public partial class App : Application
         }
 #endif
 
+        // 以管理员身份重启、自安装后重拉时，旧实例还在退出途中，等它让出
+        bool waitForPrevious = args.Contains("--relaunch") || args.Contains("--installed");
+        if (!ClaimSingleInstance(waitForPrevious))
+        {
+            // 此时还没建任何窗口、托盘，也不持有锁，直接结束进程最干净
+            // （Shutdown 之后 StartupUri 仍可能把主窗口建出来闪一下）
+            Environment.Exit(0);
+            return;
+        }
+
         base.OnStartup(e);
+    }
+
+    protected override void OnExit(ExitEventArgs e)
+    {
+        try { _instanceMutex?.ReleaseMutex(); } catch { /* 未持有 */ }
+        base.OnExit(e);
+    }
+
+    // ---------- 单实例 ----------
+    private const string InstanceMutexName = @"Local\Safe720.SingleInstance";
+    private static Mutex? _instanceMutex;
+
+    /// <summary>已有实例时广播这条消息，让它把悬浮球显示出来。</summary>
+    public static readonly uint ShowBallMessage = RegisterWindowMessage("Safe720.ShowBall");
+
+    [System.Runtime.InteropServices.DllImport("user32.dll", CharSet = System.Runtime.InteropServices.CharSet.Unicode)]
+    private static extern uint RegisterWindowMessage(string name);
+
+    [System.Runtime.InteropServices.DllImport("user32.dll")]
+    private static extern bool PostMessage(IntPtr hwnd, uint msg, IntPtr wParam, IntPtr lParam);
+
+    /// <returns>false = 已有实例在运行（已通知它显示悬浮球），本进程应退出。</returns>
+    private static bool ClaimSingleInstance(bool waitForPrevious)
+    {
+        try
+        {
+            _instanceMutex = new Mutex(false, InstanceMutexName);
+            bool owned;
+            try { owned = _instanceMutex.WaitOne(waitForPrevious ? 10_000 : 0); }
+            catch (AbandonedMutexException) { owned = true; } // 上个实例崩溃或被结束
+            if (owned) return true;
+        }
+        catch (UnauthorizedAccessException)
+        {
+            // 以管理员身份运行的实例创建的互斥量，普通权限打不开，同样说明已有实例
+        }
+        _instanceMutex = null;
+        // 广播而不是找窗口：悬浮球可能隐藏着；管理员实例已用 ChangeWindowMessageFilterEx 放行这条消息
+        PostMessage((IntPtr)0xFFFF /* HWND_BROADCAST */, ShowBallMessage, IntPtr.Zero, IntPtr.Zero);
+        return false;
     }
 
 #if SELF_INSTALL
