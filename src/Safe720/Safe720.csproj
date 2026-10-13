@@ -13,6 +13,8 @@
     <RootNamespace>Safe720</RootNamespace>
     <AssemblyName>Safe720</AssemblyName>
     <ApplicationManifest>app.manifest</ApplicationManifest>
+    <!-- exe 图标；WPF 窗口未单独设置图标时也用它 -->
+    <ApplicationIcon>Assets\app.ico</ApplicationIcon>
     <Version>0.1.0</Version>
     <Company>satone</Company>
     <Product>720安全大王</Product>
@@ -25,6 +27,10 @@
   <ItemGroup>
     <Using Remove="System.Windows.Forms" />
     <Using Remove="System.Drawing" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Resource Include="Assets\logo64.png" />
   </ItemGroup>
 
   <!-- 单文件发布版才启用一键自安装逻辑(Debug 直接运行不触发) -->

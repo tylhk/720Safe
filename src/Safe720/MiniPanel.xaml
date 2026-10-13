@@ -107,14 +107,8 @@
             <!-- 标题 -->
             <Grid>
                 <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                    <Ellipse Width="10" Height="10" Margin="0,0,8,0">
-                        <Ellipse.Fill>
-                            <LinearGradientBrush StartPoint="0,0" EndPoint="1,1">
-                                <GradientStop Color="#4DDBFF" Offset="0"/>
-                                <GradientStop Color="#2ECC71" Offset="1"/>
-                            </LinearGradientBrush>
-                        </Ellipse.Fill>
-                    </Ellipse>
+                    <Image Source="pack://application:,,,/Safe720;component/Assets/logo64.png" Width="20" Height="20" Margin="0,0,8,0"
+                           RenderOptions.BitmapScalingMode="HighQuality"/>
                     <TextBlock Text="720安全大王" FontSize="14" FontWeight="SemiBold"/>
                 </StackPanel>
                 <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
